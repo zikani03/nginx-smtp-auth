@@ -1,0 +1,21 @@
+services:
+  auth-server:
+    build: ../
+    ports:
+      - 9000:9000
+    command: "/nginx-smtp-auth -smtp-host your.smtp-server.tld -smtp-port 465"
+  
+  nginx:
+    tty: true
+    image: nginx:latest
+    restart: unless-stopped
+    ports:
+      - 80:80
+      - ${NGINX_PORT:-443}:${NGINX_PORT:-443}
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+      - ./public/:/var/www/html/public/
+    depends_on:
+      - auth-server
+    links:
+      - auth-server

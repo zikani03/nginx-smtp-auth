@@ -1,0 +1,4 @@
+nginx-smtp-auth
+/build/
+/dist/
+.DS_Store
