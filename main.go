@@ -11,6 +11,7 @@ import (
 	"net/smtp"
 	"os"
 	"strings"
+	"github.com/alexedwards/scs/v2"
 )
 
 var (
@@ -20,6 +21,8 @@ var (
 	smtpEnableTLS       bool
 	smtpSkipVerifyCerts bool
 )
+
+var sessionManager *scs.SessionManager
 
 func init() {
 	flag.StringVar(&listenAddr, "listen", ":9000", "listen address for the server")
@@ -32,8 +35,15 @@ func init() {
 func main() {
 	flag.Parse()
 
-	http.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
+	sessionManager = scs.New()
+	
+	mux := http.NewServeMux()
 
+	mux.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
+		fmt.Fprintf(w, "Hello there :")
+	})
+
+	mux.HandleFunc("/login", func(w http.ResponseWriter, req *http.Request) {
 		authHeader, ok := req.Header["Authorization"]
 		if !ok || len(authHeader) != 1 {
 			w.Header().Add("WWW-Authenticate", "Basic")
@@ -86,12 +96,19 @@ func main() {
 			http.Error(w, "invalid username or password", http.StatusUnauthorized)
 			return
 		}
+			
+		err = sessionManager.RenewToken(req.Context())
+		if err != nil {
+			http.Error(w, "invalid username or password", http.StatusUnauthorized)
+			return
+		}
 
+		sessionManager.Put(req.Context(), "auth.user", user)
 		fmt.Fprintf(w, "authenticated successfully")
 	})
 
 	fmt.Printf("Starting server at %s\n", listenAddr)
-	err := http.ListenAndServe(listenAddr, nil)
+	err := http.ListenAndServe(listenAddr, sessionManager.LoadAndSave(mux))
 	if err != nil {
 		log.Fatalf("failed to start server %v", err)
 	}
